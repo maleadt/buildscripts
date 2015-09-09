@@ -27,14 +27,22 @@ main() {
 
     BUILD_CLANG=${BUILD_CLANG:-0}
 
-    BUILD_TARGETS=${BUILD_TARGETS:-host}
+    if verlte "3.0" "$VERSION"; then
+        BUILD_TARGET_HOST="X86"
+    else
+        BUILD_TARGET_HOST="host"
+    fi
+    BUILD_TARGETS=${BUILD_TARGETS:-${BUILD_TARGET_HOST}}
 
     BUILD_DEBUG=1
+
+    BUILD_SHLIB=${BUILD_SHLIB:-1}
 
     cat <<EOD
 Build settings:
  - Toolchain version (\$VERSION): $VERSION
  - Build system (\$TOOL_BUILD=cmake|autotools): $TOOL_BUILD
+ - Shared libraries (\$BUILD_SHLIB=1|0): $BUILD_SHLIB
 
 Component selection:
  - Build clang (\$BUILD_CLANG=1|0): $BUILD_CLANG
@@ -84,16 +92,19 @@ EOD
 
     mkdir -p "${SRC_LLVM}/build"
 
-    # Determine shared build flags
     GLOBAL_FLAGS=()
-    if [[ $TOOL_BUILD == "cmake" ]]; then
-        GLOBAL_FLAGS+=(-DBUILD_SHARED_LIBS=On)
-        GLOBAL_FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
-        GLOBAL_FLAGS+=(-DLLVM_BUILD_DOCS=Off)
-    elif [[ $TOOL_BUILD == "autotools" ]]; then
-        GLOBAL_FLAGS+=(--enable-shared)
-        GLOBAL_FLAGS+=(--enable-targets=${BUILD_TARGETS})
-        GLOBAL_FLAGS+=(--disable-docs)
+
+    # Determine shared build flags
+    if [[ ${BUILD_SHLIB} == 1 ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            GLOBAL_FLAGS+=(-DBUILD_SHARED_LIBS=On)
+            GLOBAL_FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
+            GLOBAL_FLAGS+=(-DLLVM_BUILD_DOCS=Off)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            GLOBAL_FLAGS+=(--enable-shared)
+            GLOBAL_FLAGS+=(--enable-targets=${BUILD_TARGETS})
+            GLOBAL_FLAGS+=(--disable-docs)
+        fi
     fi
 
     # HACK: current clang (3.6) fail to build clang 3.4 or earlier
@@ -112,7 +123,7 @@ EOD
         export CXX
     fi
 
-    if [[ ${BUILD_DEBUG} ]]; then
+    if [[ ${BUILD_DEBUG} == 1 ]]; then
         BUILD_DEBUG="${SRC_LLVM}/build/debug+assert"
         DEST_DEBUG="${PATH_PREFIX}.debug+assert"
 
