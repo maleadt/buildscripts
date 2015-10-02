@@ -1,9 +1,7 @@
 #!/bin/bash -ue
 
 # For quick building using the defaults, use `yes ''`
-# $ yes '' | ./llvm.sh VERSION=3.7
-
-PREFIX=~/Lokaal/llvm
+# $ yes '' | VERSION=3.7 ./llvm.sh
 
 
 
@@ -11,18 +9,52 @@ PREFIX=~/Lokaal/llvm
 # Main
 #
 
+error() {
+    echo "Error: $1" >&2
+    exit 1
+}
+
+warn() {
+    echo "Warning: $1" >&2
+}
+
+# `which`-like command, looking for a command (possibly a relative one) in a
+# haystack of directories
+#
+# USAGE: full_which COMMAND [COLON:SEPARATED:DIRS]
+full_which() {
+    NEEDLE=$1
+    if [[ $# == 1 ]]; then
+        HAYSTACK=$PATH
+    else
+        HAYSTACK=$2
+    fi
+
+    for DIR in ${HAYSTACK//:/ }; do
+        [[ -n "$DIR" ]] || continue
+
+        if [[ -f "$DIR/$NEEDLE" ]]; then
+            echo "$DIR/$NEEDLE"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 main() {
     #
     # Configuration
     #
+
+    PREFIX=${PREFIX:-~/Lokaal/llvm}
 
     VERSION=${VERSION:-trunk}
 
     TOOL_BUILD=${TOOL_BUILD:-cmake}
     TOOL_BUILD=${TOOL_BUILD,,}
     if [[ $TOOL_BUILD != "cmake" && $TOOL_BUILD != "autotools" ]]; then
-        echo "Invalid value for build system" >&2
-        exit 1
+        error "invalid build system ${TOOL_BUILD}"
     fi
 
     BUILD_CLANG=${BUILD_CLANG:-0}
@@ -40,6 +72,7 @@ main() {
 
     cat <<EOD
 Build settings:
+ - Installation prefix (\$PREFIX): $PREFIX
  - Toolchain version (\$VERSION): $VERSION
  - Build system (\$TOOL_BUILD=cmake|autotools): $TOOL_BUILD
  - Shared libraries (\$BUILD_SHLIB=1|0): $BUILD_SHLIB
@@ -56,6 +89,8 @@ EOD
     #
     # Prepare
     #
+
+    [[ -d "$PREFIX" ]] || error "installation prefix $PREFIX does not exist..."
 
     # Determine source URL
     URL_PREFIX="https://llvm.org/svn/llvm-project"
@@ -107,13 +142,13 @@ EOD
         fi
     fi
 
-    # HACK: current clang (3.6) fail to build clang 3.4 or earlier
+    # HACK: current clang (3.6) fails to build clang 3.4 or earlier
     if verlte "3.4" "$VERSION"; then
-        CC=/usr/local/lib/ccache/bin/clang
-        CXX=/usr/local/lib/ccache/bin/clang++
+        CC=$(full_which "ccache/bin/clang" "$PATH:/usr/lib:/usr/local/lib")
+        CXX=$(full_which "ccache/bin/clang++" "$PATH:/usr/lib:/usr/local/lib")
     else
-        CC=/usr/lib/ccache/bin/cc
-        CXX=/usr/lib/ccache/bin/c++
+        CC=$(full_which "ccache/bin/cc" "$PATH:/usr/lib:/usr/local/lib")
+        CXX=$(full_which "ccache/bin/c++" "$PATH:/usr/lib:/usr/local/lib")
     fi
     if [[ $TOOL_BUILD == "cmake" ]]; then
         GLOBAL_FLAGS+=(-DCMAKE_C_COMPILER=$CC)
@@ -177,8 +212,7 @@ download_svn() {
             [cC])
                 ;;
             *)
-                echo Invalid response >&2
-                exit 1
+                error "invalid response"
                 ;;
         esac
     fi
@@ -197,7 +231,7 @@ build_llvm() {
     shift 5
 
     if [[ -d "${BUILDDIR}" ]]; then
-        echo "Warning: build directory for $NAME already exists..."
+        warn "build directory for $NAME already exists..."
         read -r -n1 -p "Continue without doing anything [c], perform incremental build [I] or start from scratch [s]? "
         echo
         case $REPLY in
@@ -210,8 +244,7 @@ build_llvm() {
                 return
                 ;;
             *)
-                echo Invalid response >&2
-                exit 1
+                error "invalid response"
                 ;;
         esac
     fi
@@ -258,8 +291,7 @@ build_llvm() {
         [nN]|"")
             ;;
         *)
-            echo Invalid response >&2
-            exit 1
+            error "invalid response"
             ;;
     esac
 
