@@ -119,7 +119,8 @@ EOD
 
     download_svn "LLVM sources ($VERSION)" "${URL_LLVM}" "${SRC_LLVM}"
 
-    if [[ $BUILD_CLANG ]]; then
+    if [[ $BUILD_CLANG == 1 ]]; then
+        echo "Downloading Clang"
         URL_CLANG="${URL_PREFIX}/cfe/${URL_POSTFIX}"
         SRC_CLANG="${SRC_LLVM}/tools/clang"
 
@@ -136,7 +137,7 @@ EOD
     GLOBAL_FLAGS=()
 
     # Determine shared build flags
-    if [[ ${BUILD_SHLIB} == 1 ]]; then
+    if [[ $BUILD_SHLIB == 1 ]]; then
         if [[ $TOOL_BUILD == "cmake" ]]; then
             GLOBAL_FLAGS+=(-DBUILD_SHARED_LIBS=On)
             GLOBAL_FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
@@ -164,7 +165,7 @@ EOD
         export CXX
     fi
 
-    if [[ ${BUILD_DEBUG} == 1 ]]; then
+    if [[ $BUILD_DEBUG == 1 ]]; then
         BUILD_DEBUG="${SRC_LLVM}/build/debug+assert"
         DEST_DEBUG="${PATH_PREFIX}.debug+assert"
 
