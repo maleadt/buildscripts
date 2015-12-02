@@ -3,7 +3,12 @@
 # For quick building using the defaults, use `yes ''`
 # $ yes '' | VERSION=3.7 ./llvm.sh
 
-
+# TODO: conditionalize ccache
+# TODO: if compiling using clang & ccache,
+#       use -Qunused-arguments & -fcolor-diagnostics ?
+#       http://petereisentraut.blogspot.be/2011/05/ccache-and-clang.html
+#       http://peter.eisentraut.org/blog/2014/12/01/ccache-and-clang-part-3/
+export CCACHE_CPP2=1
 
 ################################################################################
 # Main
@@ -39,6 +44,7 @@ full_which() {
         fi
     done
 
+    echo "Could not find $NEEDLE in $HAYSTACK" >&2
     return 1
 }
 
