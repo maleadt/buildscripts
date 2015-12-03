@@ -64,6 +64,7 @@ main() {
     fi
 
     BUILD_CLANG=${BUILD_CLANG:-0}
+    BUILD_RT=${BUILD_RT:-0}
 
     if verlte "3.0" "$VERSION"; then
         BUILD_TARGET_HOST="X86"
@@ -85,6 +86,7 @@ Build settings:
 
 Component selection:
  - Build clang (\$BUILD_CLANG=1|0): $BUILD_CLANG
+ - Build compiler-rt (\$BUILD_RT=1|0): $BUILD_RT
  - Targets to build (\$BUILD_TARGETS=foo,bar): $BUILD_TARGETS
 
 EOD
@@ -120,11 +122,17 @@ EOD
     download_svn "LLVM sources ($VERSION)" "${URL_LLVM}" "${SRC_LLVM}"
 
     if [[ $BUILD_CLANG == 1 ]]; then
-        echo "Downloading Clang"
         URL_CLANG="${URL_PREFIX}/cfe/${URL_POSTFIX}"
         SRC_CLANG="${SRC_LLVM}/tools/clang"
 
         download_svn "Clang sources ($VERSION)" "${URL_CLANG}" "${SRC_CLANG}"
+    fi
+
+    if [[ $BUILD_RT == 1 ]]; then
+        URL_RT="${URL_PREFIX}/compiler-rt/${URL_POSTFIX}"
+        SRC_RT="${SRC_LLVM}/projects/compiler-rt"
+
+        download_svn "Runtime sources ($VERSION)" "${URL_RT}" "${SRC_RT}"
     fi
 
 
