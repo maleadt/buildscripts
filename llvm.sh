@@ -66,8 +66,8 @@ write_config() {
 main() {
     # If passed a path, read build.conf
     if [[ $# == 1 ]]; then
-        local CONFIG="$1/build.conf"
-        [[ -f $CONFIG ]] || error "no build.conf at $1"
+        local CONFIG=$1
+        [[ -f $CONFIG ]] || error "build configuration '$1' does not exist"
         source "$CONFIG"
     elif [[ $# != 0 ]]; then
         error "invalid command-line arguments"
@@ -195,17 +195,18 @@ EOD
         fi
     fi
 
-    local DIR_DEST="${PATH_PREFIX}.$TAG"
-    write_config $DIR_DEST/build.conf.new
-    if [[ -e $DIR_DEST/build.conf ]]; then
-        if ! diff $DIR_DEST/build.conf.new $DIR_DEST/build.conf >/dev/null; then
-            warn "pre-existing build in $DIR_DEST has been configured with different options:"
-            diff $DIR_DEST/build.conf.new $DIR_DEST/build.conf || true
+    local DESTDIR="${PATH_PREFIX}.$TAG"
+
+    write_config $DESTDIR.conf.new
+    if [[ -e $DESTDIR.conf ]]; then
+        if ! diff $DESTDIR.conf.new $DESTDIR.conf >/dev/null; then
+            warn "pre-existing build in $DESTDIR has been configured with different options:"
+            diff $DESTDIR.conf.new $DESTDIR.conf || true
             echo
             read -r -n1 -p "Press any key to continue anyway... "
         fi
     fi
-    mv $DIR_DEST/build.conf.new $DIR_DEST/build.conf
+    mv $DESTDIR.conf.new $DESTDIR.conf
 
 
     #
@@ -245,11 +246,10 @@ EOD
     #
 
     mkdir -p "${SRC_LLVM}/build"
-    local DIR_BUILD="${SRC_LLVM}/build/$TAG"
+    local BUILDDIR="${SRC_LLVM}/build/$TAG"
 
-    build_llvm  "LLVM ($VERSION $TAG)" "$VERSION" \
-                "${SRC_LLVM}" "${DIR_BUILD}" "${DIR_DEST}" \
-                "${FLAGS[@]}"
+    build_llvm  "LLVM ($VERSION $TAG)" "$VERSION" "${SRC_LLVM}" \
+                "${BUILDDIR}" "${DESTDIR}" "${FLAGS[@]}"
 
     echo "All done!"
     exit 0
