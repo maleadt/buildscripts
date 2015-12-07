@@ -10,6 +10,9 @@
 #       http://peter.eisentraut.org/blog/2014/12/01/ccache-and-clang-part-3/
 export CCACHE_CPP2=1
 
+# TODO: when building incrementally, check if the settings match
+
+
 ################################################################################
 # Main
 #
@@ -73,7 +76,8 @@ main() {
     fi
     BUILD_TARGETS=${BUILD_TARGETS:-${BUILD_TARGET_HOST}}
 
-    BUILD_DEBUG=1
+    BUILD_DEBUG=${BUILD_DEBUG:-0}
+    BUILD_ASSERTIONS=${BUILD_ASSERTIONS:-1}
 
     BUILD_SHLIB=${BUILD_SHLIB:-1}
 
@@ -83,6 +87,8 @@ Build settings:
  - Toolchain version (\$VERSION): $VERSION
  - Build system (\$TOOL_BUILD=cmake|autotools): $TOOL_BUILD
  - Shared libraries (\$BUILD_SHLIB=1|0): $BUILD_SHLIB
+ - Assertions (\$BUILD_ASSERTIONS=1|0): $BUILD_ASSERTIONS
+ - Debug info (\$BUILD_DEBUG=1|0): $BUILD_DEBUG
 
 Component selection:
  - Build clang (\$BUILD_CLANG=1|0): $BUILD_CLANG
@@ -174,21 +180,42 @@ EOD
     fi
 
     if [[ $BUILD_DEBUG == 1 ]]; then
-        BUILD_DEBUG="${SRC_LLVM}/build/debug+assert"
-        DEST_DEBUG="${PATH_PREFIX}.debug+assert"
-
-        BUILDTYPE_FLAGS=()
+        TAG="debug"
         if [[ $TOOL_BUILD == "cmake" ]]; then
             BUILDTYPE_FLAGS+=(-DCMAKE_BUILD_TYPE=Debug)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            BUILDTYPE_FLAGS+=(--enable-assertions)
+            BUILDTYPE_FLAGS+=(--disable-optimized)
         fi
-
-        build_llvm  "LLVM ($VERSION debug)" "$VERSION" \
-                    "${SRC_LLVM}" "${BUILD_DEBUG}" "${DEST_DEBUG}" \
-                    "${GLOBAL_FLAGS[@]}" "${BUILDTYPE_FLAGS[@]}"
+    else
+        TAG="release"
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            BUILDTYPE_FLAGS+=(-DCMAKE_BUILD_TYPE=Release)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            BUILDTYPE_FLAGS+=(--enable-optimized)
+        fi
     fi
 
+    if [[ $BUILD_ASSERTIONS == 1 ]]; then
+        TAG+="+asserts"
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            BUILDTYPE_FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=True)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            BUILDTYPE_FLAGS+=(--enable-assertions)
+        fi
+    else
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            BUILDTYPE_FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=False)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            BUILDTYPE_FLAGS+=(--disable-assertions)
+        fi
+    fi
+
+    BUILD_DEBUG="${SRC_LLVM}/build/$TAG"
+    DEST_DEBUG="${PATH_PREFIX}.$TAG"
+
+    build_llvm  "LLVM ($VERSION $TAG)" "$VERSION" \
+                "${SRC_LLVM}" "${BUILD_DEBUG}" "${DEST_DEBUG}" \
+                "${GLOBAL_FLAGS[@]}" "${BUILDTYPE_FLAGS[@]}"
 
     echo "All done!"
     exit 0
