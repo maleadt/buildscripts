@@ -10,7 +10,7 @@
 #       http://peter.eisentraut.org/blog/2014/12/01/ccache-and-clang-part-3/
 export CCACHE_CPP2=1
 
-# TODO: when building incrementally, check if the settings match
+# TODO: proper usage()
 
 
 ################################################################################
@@ -31,11 +31,11 @@ warn() {
 #
 # USAGE: full_which COMMAND [COLON:SEPARATED:DIRS]
 full_which() {
-    NEEDLE=$1
+    local NEEDLE=$1
     if [[ $# == 1 ]]; then
-        HAYSTACK=$PATH
+        local HAYSTACK=$PATH
     else
-        HAYSTACK=$2
+        local HAYSTACK=$2
     fi
 
     for DIR in ${HAYSTACK//:/ }; do
@@ -51,7 +51,29 @@ full_which() {
     return 1
 }
 
+write_config() {
+    local FILENAME=$1
+    >$FILENAME
+
+    for VAR in  PREFIX VERSION TOOL_BUILD \
+                BUILD_SHLIB BUILD_ASSERTIONS BUILD_DEBUG \
+                BUILD_CLANG BUILD_RT BUILD_TARGETS; do
+        local VALUE=${!VAR}
+        echo "$VAR='${VALUE//\'/''}'" >> $FILENAME
+    done
+}
+
 main() {
+    # If passed a path, read build.conf
+    if [[ $# == 1 ]]; then
+        local CONFIG="$1/build.conf"
+        [[ -f $CONFIG ]] || error "no build.conf at $1"
+        source "$CONFIG"
+    elif [[ $# != 0 ]]; then
+        error "invalid command-line arguments"
+    fi
+
+
     #
     # Configuration
     #
@@ -66,6 +88,11 @@ main() {
         error "invalid build system ${TOOL_BUILD}"
     fi
 
+    BUILD_SHLIB=${BUILD_SHLIB:-1}
+
+    BUILD_ASSERTIONS=${BUILD_ASSERTIONS:-1}
+    BUILD_DEBUG=${BUILD_DEBUG:-0}
+
     BUILD_CLANG=${BUILD_CLANG:-0}
     BUILD_RT=${BUILD_RT:-0}
 
@@ -75,11 +102,6 @@ main() {
         BUILD_TARGET_HOST="host"
     fi
     BUILD_TARGETS=${BUILD_TARGETS:-${BUILD_TARGET_HOST}}
-
-    BUILD_DEBUG=${BUILD_DEBUG:-0}
-    BUILD_ASSERTIONS=${BUILD_ASSERTIONS:-1}
-
-    BUILD_SHLIB=${BUILD_SHLIB:-1}
 
     cat <<EOD
 Build settings:
@@ -98,6 +120,8 @@ Component selection:
 EOD
 
     read -r -n1 -p "Press any key to continue... "
+    echo
+
 
 
     #
@@ -106,60 +130,21 @@ EOD
 
     [[ -d "$PREFIX" ]] || error "installation prefix $PREFIX does not exist..."
 
-    # Determine source URL
-    URL_PREFIX="https://llvm.org/svn/llvm-project"
-    if [[ $VERSION == "trunk" ]]; then
-        URL_POSTFIX="/trunk"
-    else
-        URL_POSTFIX="branches/release_"$(echo $VERSION | tr -d '.')
-    fi
-
     # Determine path prefix
-    PATH_PREFIX="$PREFIX/llvm-$VERSION"
+    local PATH_PREFIX="$PREFIX/llvm-$VERSION"
 
-
-    #
-    # Check-out
-    #
-
-    URL_LLVM="${URL_PREFIX}/llvm/${URL_POSTFIX}"
-    SRC_LLVM="${PATH_PREFIX}.src"
-
-    download_svn "LLVM sources ($VERSION)" "${URL_LLVM}" "${SRC_LLVM}"
-
-    if [[ $BUILD_CLANG == 1 ]]; then
-        URL_CLANG="${URL_PREFIX}/cfe/${URL_POSTFIX}"
-        SRC_CLANG="${SRC_LLVM}/tools/clang"
-
-        download_svn "Clang sources ($VERSION)" "${URL_CLANG}" "${SRC_CLANG}"
-    fi
-
-    if [[ $BUILD_RT == 1 ]]; then
-        URL_RT="${URL_PREFIX}/compiler-rt/${URL_POSTFIX}"
-        SRC_RT="${SRC_LLVM}/projects/compiler-rt"
-
-        download_svn "Runtime sources ($VERSION)" "${URL_RT}" "${SRC_RT}"
-    fi
-
-
-    #
-    # Build
-    #
-
-    mkdir -p "${SRC_LLVM}/build"
-
-    GLOBAL_FLAGS=()
+    local FLAGS=()
 
     # Determine shared build flags
     if [[ $BUILD_SHLIB == 1 ]]; then
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            GLOBAL_FLAGS+=(-DBUILD_SHARED_LIBS=On)
-            GLOBAL_FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
-            GLOBAL_FLAGS+=(-DLLVM_BUILD_DOCS=Off)
+            FLAGS+=(-DBUILD_SHARED_LIBS=On)
+            FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
+            FLAGS+=(-DLLVM_BUILD_DOCS=Off)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            GLOBAL_FLAGS+=(--enable-shared)
-            GLOBAL_FLAGS+=(--enable-targets=${BUILD_TARGETS})
-            GLOBAL_FLAGS+=(--disable-docs)
+            FLAGS+=(--enable-shared)
+            FLAGS+=(--enable-targets=${BUILD_TARGETS})
+            FLAGS+=(--disable-docs)
         fi
     fi
 
@@ -172,8 +157,8 @@ EOD
         CXX=$(full_which "ccache/bin/c++" "$PATH:/usr/lib:/usr/local/lib")
     fi
     if [[ $TOOL_BUILD == "cmake" ]]; then
-        GLOBAL_FLAGS+=(-DCMAKE_C_COMPILER=$CC)
-        GLOBAL_FLAGS+=(-DCMAKE_CXX_COMPILER=$CXX)
+        FLAGS+=(-DCMAKE_C_COMPILER=$CC)
+        FLAGS+=(-DCMAKE_CXX_COMPILER=$CXX)
     elif [[ $TOOL_BUILD == "autotools" ]]; then
         export CC
         export CXX
@@ -182,40 +167,89 @@ EOD
     if [[ $BUILD_DEBUG == 1 ]]; then
         TAG="debug"
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            BUILDTYPE_FLAGS+=(-DCMAKE_BUILD_TYPE=Debug)
+            FLAGS+=(-DCMAKE_BUILD_TYPE=Debug)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            BUILDTYPE_FLAGS+=(--disable-optimized)
+            FLAGS+=(--disable-optimized)
         fi
     else
         TAG="release"
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            BUILDTYPE_FLAGS+=(-DCMAKE_BUILD_TYPE=Release)
+            FLAGS+=(-DCMAKE_BUILD_TYPE=Release)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            BUILDTYPE_FLAGS+=(--enable-optimized)
+            FLAGS+=(--enable-optimized)
         fi
     fi
 
     if [[ $BUILD_ASSERTIONS == 1 ]]; then
         TAG+="+asserts"
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            BUILDTYPE_FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=True)
+            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=True)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            BUILDTYPE_FLAGS+=(--enable-assertions)
+            FLAGS+=(--enable-assertions)
         fi
     else
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            BUILDTYPE_FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=False)
+            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=False)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            BUILDTYPE_FLAGS+=(--disable-assertions)
+            FLAGS+=(--disable-assertions)
         fi
     fi
 
-    BUILD_DEBUG="${SRC_LLVM}/build/$TAG"
-    DEST_DEBUG="${PATH_PREFIX}.$TAG"
+    local DIR_DEST="${PATH_PREFIX}.$TAG"
+    write_config $DIR_DEST/build.conf.new
+    if [[ -e $DIR_DEST/build.conf ]]; then
+        if ! diff $DIR_DEST/build.conf.new $DIR_DEST/build.conf >/dev/null; then
+            warn "pre-existing build in $DIR_DEST has been configured with different options:"
+            diff $DIR_DEST/build.conf.new $DIR_DEST/build.conf || true
+            echo
+            read -r -n1 -p "Press any key to continue anyway... "
+        fi
+    fi
+    mv $DIR_DEST/build.conf.new $DIR_DEST/build.conf
+
+
+    #
+    # Download
+    #
+
+    # Determine source URL
+    local URL_PREFIX="https://llvm.org/svn/llvm-project"
+    if [[ $VERSION == "trunk" ]]; then
+        local URL_POSTFIX="/trunk"
+    else
+        local URL_POSTFIX="branches/release_"$(echo $VERSION | tr -d '.')
+    fi
+
+    local URL_LLVM="${URL_PREFIX}/llvm/${URL_POSTFIX}"
+    local SRC_LLVM="${PATH_PREFIX}.src"
+
+    download_svn "LLVM sources ($VERSION)" "${URL_LLVM}" "${SRC_LLVM}"
+
+    if [[ $BUILD_CLANG == 1 ]]; then
+        local URL_CLANG="${URL_PREFIX}/cfe/${URL_POSTFIX}"
+        local SRC_CLANG="${SRC_LLVM}/tools/clang"
+
+        download_svn "Clang sources ($VERSION)" "${URL_CLANG}" "${SRC_CLANG}"
+    fi
+
+    if [[ $BUILD_RT == 1 ]]; then
+        local URL_RT="${URL_PREFIX}/compiler-rt/${URL_POSTFIX}"
+        local SRC_RT="${SRC_LLVM}/projects/compiler-rt"
+
+        download_svn "Runtime sources ($VERSION)" "${URL_RT}" "${SRC_RT}"
+    fi
+
+
+    #
+    # Build
+    #
+
+    mkdir -p "${SRC_LLVM}/build"
+    local DIR_BUILD="${SRC_LLVM}/build/$TAG"
 
     build_llvm  "LLVM ($VERSION $TAG)" "$VERSION" \
-                "${SRC_LLVM}" "${BUILD_DEBUG}" "${DEST_DEBUG}" \
-                "${GLOBAL_FLAGS[@]}" "${BUILDTYPE_FLAGS[@]}"
+                "${SRC_LLVM}" "${DIR_BUILD}" "${DIR_DEST}" \
+                "${FLAGS[@]}"
 
     echo "All done!"
     exit 0
@@ -236,9 +270,9 @@ verlt() {
 }
 
 download_svn() {
-    NAME=$1
-    URL=$2
-    DEST=$3
+    local NAME=$1
+    local URL=$2
+    local DEST=$3
 
     if [[ -d "${DEST}" ]]; then
         echo "Warning: directory for $NAME already exists..."
@@ -265,11 +299,11 @@ download_svn() {
 }
 
 build_llvm() {
-    NAME=$1
-    VERSION=$2
-    SRCDIR=$3
-    BUILDDIR=$4
-    DESTDIR=$5
+    local NAME=$1
+    local VERSION=$2
+    local SRCDIR=$3
+    local BUILDDIR=$4
+    local DESTDIR=$5
     shift 5
 
     if [[ -d "${BUILDDIR}" ]]; then
@@ -297,20 +331,20 @@ build_llvm() {
 
     # Configure
     if [[ ! -d "${BUILDDIR}" ]]; then
-        LOCAL_FLAGS=("$@")
+        local FLAGS=("$@")
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            LOCAL_FLAGS+=(-GNinja)
-            LOCAL_FLAGS+=(-DCMAKE_INSTALL_PREFIX="${DESTDIR}")
+            FLAGS+=(-GNinja)
+            FLAGS+=(-DCMAKE_INSTALL_PREFIX="${DESTDIR}")
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            LOCAL_FLAGS+=(--prefix="${DESTDIR}")
+            FLAGS+=(--prefix="${DESTDIR}")
         fi
 
         mkdir "${BUILDDIR}"
         pushd "${BUILDDIR}"
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            cmake "${LOCAL_FLAGS[@]}" "${SRCDIR}"
+            cmake "${FLAGS[@]}" "${SRCDIR}"
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            "${SRCDIR}"/configure "${LOCAL_FLAGS[@]}"
+            "${SRCDIR}"/configure "${FLAGS[@]}"
         fi
         popd
     fi
