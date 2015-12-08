@@ -272,18 +272,18 @@ verlt() {
 download_svn() {
     local NAME=$1
     local URL=$2
-    local DEST=$3
+    local DESTDIR=$3
 
-    if [[ -d "${DEST}" ]]; then
+    if [[ -d "${DESTDIR}" ]]; then
         echo "Warning: directory for $NAME already exists..."
         read -r -n1 -p "Continue without doing anything [c], update [U] or start from scratch [s]? "
         echo
         case $REPLY in
             [uU]|"")
-                svn update "${DEST}"
+                svn update "${DESTDIR}"
                 ;;
             [sS])
-                rm -rf "${DEST}"
+                rm -rf "${DESTDIR}"
                 ;;
             [cC])
                 ;;
@@ -293,8 +293,8 @@ download_svn() {
         esac
     fi
 
-    if [[ ! -d "${DEST}" ]]; then
-        svn co "${URL}" "${DEST}"
+    if [[ ! -d "${DESTDIR}" ]]; then
+        svn co "${URL}" "${DESTDIR}"
     fi
 }
 
