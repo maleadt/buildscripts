@@ -169,7 +169,7 @@ EOD
         if [[ $TOOL_BUILD == "cmake" ]]; then
             FLAGS+=(-DCMAKE_BUILD_TYPE=Debug)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            FLAGS+=(--disable-optimized)
+            FLAGS+=(--disable-optimized --enable-debug-symbols --enable-keep-symbols)
         fi
     else
         TAG="release"
