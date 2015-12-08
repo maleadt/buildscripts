@@ -350,12 +350,14 @@ build_llvm() {
     fi
 
     # Compile and install
+    local TOOL_FLAGS=(-C "${BUILDDIR}")
     if [[ $TOOL_BUILD == "cmake" ]]; then
         TOOL_MAKE="ninja"
     elif [[ $TOOL_BUILD == "autotools" ]]; then
         TOOL_MAKE="make"
+        TOOL_FLAGS+=(-j$(($(nproc)+1)))
     fi
-    $TOOL_MAKE -C "${BUILDDIR}" -j$(($(nproc)+1)) install
+    $TOOL_MAKE  "${TOOL_FLAGS[@]}" install
 
     # Clean?
     read -r -n1 -p "Clean the build directory of $NAME [y/N]? "
