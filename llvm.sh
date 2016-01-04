@@ -57,7 +57,7 @@ write_config() {
 
     for VAR in  PREFIX VERSION TOOL_BUILD \
                 BUILD_SHLIB BUILD_ASSERTIONS BUILD_DEBUG \
-                BUILD_CLANG BUILD_RT BUILD_TARGETS; do
+                BUILD_CLANG BUILD_RT BUILD_LLDB BUILD_TARGETS; do
         local VALUE=${!VAR}
         echo "$VAR='${VALUE//\'/''}'" >> $FILENAME
     done
@@ -95,6 +95,7 @@ main() {
 
     BUILD_CLANG=${BUILD_CLANG:-0}
     BUILD_RT=${BUILD_RT:-0}
+    BUILD_LLDB=${BUILD_LLDB:-0}
 
     if verlte "3.0" "$VERSION"; then
         BUILD_TARGET_HOST="X86"
@@ -115,6 +116,7 @@ Build settings:
 Component selection:
  - Build clang (\$BUILD_CLANG=1|0): $BUILD_CLANG
  - Build compiler-rt (\$BUILD_RT=1|0): $BUILD_RT
+ - Build LLDB (\$BUILD_LLDB=1|0): $BUILD_LLDB
  - Targets to build (\$BUILD_TARGETS=foo,bar): $BUILD_TARGETS
 
 EOD
@@ -238,6 +240,13 @@ EOD
         local SRC_RT="${SRC_LLVM}/projects/compiler-rt"
 
         download_svn "Runtime sources ($VERSION)" "${URL_RT}" "${SRC_RT}"
+    fi
+
+    if [[ $BUILD_LLDB == 1 ]]; then
+        local URL_LLDB="${URL_PREFIX}/lldb/${URL_POSTFIX}"
+        local SRC_LLDB="${SRC_LLVM}/tools/lldb"
+
+        download_svn "LLDB sources ($VERSION)" "${URL_LLDB}" "${SRC_LLDB}"
     fi
 
 
