@@ -135,67 +135,8 @@ EOD
     # Determine path prefix
     local PATH_PREFIX="$PREFIX/llvm-$VERSION"
 
-    local FLAGS=()
-
-    # Determine shared build flags
-    if [[ $BUILD_SHLIB == 1 ]]; then
-        if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DBUILD_SHARED_LIBS=On)
-            FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
-            FLAGS+=(-DLLVM_BUILD_DOCS=Off)
-        elif [[ $TOOL_BUILD == "autotools" ]]; then
-            FLAGS+=(--enable-shared)
-            FLAGS+=(--enable-targets=${BUILD_TARGETS})
-            FLAGS+=(--disable-docs)
-        fi
-    fi
-
-    # HACK: current clang (3.6) fails to build clang 3.4 or earlier
-    if verlte "3.4" "$VERSION"; then
-        CC=$(full_which "ccache/bin/clang" "$PATH:/usr/lib:/usr/local/lib")
-        CXX=$(full_which "ccache/bin/clang++" "$PATH:/usr/lib:/usr/local/lib")
-    else
-        CC=$(full_which "ccache/bin/cc" "$PATH:/usr/lib:/usr/local/lib")
-        CXX=$(full_which "ccache/bin/c++" "$PATH:/usr/lib:/usr/local/lib")
-    fi
-    if [[ $TOOL_BUILD == "cmake" ]]; then
-        FLAGS+=(-DCMAKE_C_COMPILER=$CC)
-        FLAGS+=(-DCMAKE_CXX_COMPILER=$CXX)
-    elif [[ $TOOL_BUILD == "autotools" ]]; then
-        export CC
-        export CXX
-    fi
-
-    if [[ $BUILD_DEBUG == 1 ]]; then
-        TAG="debug"
-        if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DCMAKE_BUILD_TYPE=Debug)
-        elif [[ $TOOL_BUILD == "autotools" ]]; then
-            FLAGS+=(--disable-optimized --enable-debug-symbols --enable-keep-symbols)
-        fi
-    else
-        TAG="release"
-        if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DCMAKE_BUILD_TYPE=Release)
-        elif [[ $TOOL_BUILD == "autotools" ]]; then
-            FLAGS+=(--enable-optimized)
-        fi
-    fi
-
-    if [[ $BUILD_ASSERTIONS == 1 ]]; then
-        TAG+="+asserts"
-        if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=True)
-        elif [[ $TOOL_BUILD == "autotools" ]]; then
-            FLAGS+=(--enable-assertions)
-        fi
-    else
-        if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=False)
-        elif [[ $TOOL_BUILD == "autotools" ]]; then
-            FLAGS+=(--disable-assertions)
-        fi
-    fi
+    [[ $BUILD_DEBUG = 1 ]] && TAG="debug" || TAG="release"
+    [[ $BUILD_ASSERTIONS = 1 ]] && TAG+="+asserts"
 
     local DESTDIR="${PATH_PREFIX}.$TAG"
 
@@ -228,23 +169,23 @@ EOD
 
     download_svn "LLVM sources ($VERSION)" "${URL_LLVM}" "${SRC_LLVM}"
 
+    local SRC_CLANG="${SRC_LLVM}/tools/clang"
     if [[ $BUILD_CLANG == 1 ]]; then
         local URL_CLANG="${URL_PREFIX}/cfe/${URL_POSTFIX}"
-        local SRC_CLANG="${SRC_LLVM}/tools/clang"
 
         download_svn "Clang sources ($VERSION)" "${URL_CLANG}" "${SRC_CLANG}"
     fi
 
+    local SRC_RT="${SRC_LLVM}/projects/compiler-rt"
     if [[ $BUILD_RT == 1 ]]; then
         local URL_RT="${URL_PREFIX}/compiler-rt/${URL_POSTFIX}"
-        local SRC_RT="${SRC_LLVM}/projects/compiler-rt"
 
         download_svn "Runtime sources ($VERSION)" "${URL_RT}" "${SRC_RT}"
     fi
 
+    local SRC_LLDB="${SRC_LLVM}/tools/lldb"
     if [[ $BUILD_LLDB == 1 ]]; then
         local URL_LLDB="${URL_PREFIX}/lldb/${URL_POSTFIX}"
-        local SRC_LLDB="${SRC_LLVM}/tools/lldb"
 
         download_svn "LLDB sources ($VERSION)" "${URL_LLDB}" "${SRC_LLDB}"
     fi
@@ -253,6 +194,90 @@ EOD
     #
     # Build
     #
+
+    local FLAGS=()
+
+    # Debug symbols
+    if [[ $BUILD_DEBUG == 1 ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DCMAKE_BUILD_TYPE=Debug)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            FLAGS+=(--disable-optimized --enable-debug-symbols --enable-keep-symbols)
+        fi
+    else
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DCMAKE_BUILD_TYPE=Release)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            FLAGS+=(--enable-optimized)
+        fi
+    fi
+
+    # Assertions
+    if [[ $BUILD_ASSERTIONS == 1 ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=True)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            FLAGS+=(--enable-assertions)
+        fi
+    else
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=False)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            FLAGS+=(--disable-assertions)
+        fi
+    fi
+
+    # Determine shared build flags
+    if [[ $BUILD_SHLIB == 1 ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DBUILD_SHARED_LIBS=On)
+            FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
+            FLAGS+=(-DLLVM_BUILD_DOCS=Off)
+        elif [[ $TOOL_BUILD == "autotools" ]]; then
+            FLAGS+=(--enable-shared)
+            FLAGS+=(--enable-targets=${BUILD_TARGETS})
+            FLAGS+=(--disable-docs)
+        fi
+    fi
+
+    # HACK: current clang (3.6) fails to build clang 3.4 or earlier
+    if verlte "3.4" "$VERSION"; then
+        CC=$(full_which "ccache/bin/clang" "$PATH:/usr/lib:/usr/local/lib")
+        CXX=$(full_which "ccache/bin/clang++" "$PATH:/usr/lib:/usr/local/lib")
+    else
+        CC=$(full_which "ccache/bin/cc" "$PATH:/usr/lib:/usr/local/lib")
+        CXX=$(full_which "ccache/bin/c++" "$PATH:/usr/lib:/usr/local/lib")
+    fi
+    if [[ $TOOL_BUILD == "cmake" ]]; then
+        FLAGS+=(-DCMAKE_C_COMPILER=$CC)
+        FLAGS+=(-DCMAKE_CXX_COMPILER=$CXX)
+    elif [[ $TOOL_BUILD == "autotools" ]]; then
+        export CC
+        export CXX
+    fi
+
+    # Forcibly disable targets we don't want if their sources are present
+    if [[ $BUILD_CLANG == 0 && -d $SRC_CLANG ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DLLVM_EXTERNAL_CLANG_BUILD=Off)
+        else
+            error "not implemented"
+        fi
+    fi
+    if [[ $BUILD_RT == 0 && -d $SRC_RT ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DLLVM_EXTERNAL_COMPILER_RT_BUILD=Off)
+        else
+            error "not implemented"
+        fi
+    fi
+    if [[ $BUILD_LLDB == 0 && -d $SRC_LLDB ]]; then
+        if [[ $TOOL_BUILD == "cmake" ]]; then
+            FLAGS+=(-DLLVM_EXTERNAL_LLDB_BUILD=Off)
+        else
+            error "not implemented"
+        fi
+    fi
 
     mkdir -p "${SRC_LLVM}/build"
     local BUILDDIR="${SRC_LLVM}/build/$TAG"
