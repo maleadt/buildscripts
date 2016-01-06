@@ -26,12 +26,12 @@ warn() {
     echo "Warning: $1" >&2
 }
 
-# `which`-like command, looking for a command (possibly a relative one) in a
-# haystack of directories
+# `which`-like command, looking for a command (possibly a relative one, and
+# possibly a set of colon-separated candidates) in a haystack of directories
 #
-# USAGE: full_which COMMAND [COLON:SEPARATED:DIRS]
+# USAGE: full_which COMMAND[:COLON:SEPARATED] [COLON:SEPARATED:DIRS]
 full_which() {
-    local NEEDLE=$1
+    local NEEDLES=$1
     if [[ $# == 1 ]]; then
         local HAYSTACK=$PATH
     else
@@ -41,13 +41,15 @@ full_which() {
     for DIR in ${HAYSTACK//:/ }; do
         [[ -n "$DIR" ]] || continue
 
-        if [[ -f "$DIR/$NEEDLE" ]]; then
-            echo "$DIR/$NEEDLE"
-            return 0
-        fi
+        for NEEDLE in ${NEEDLES//:/ }; do
+            if [[ -f "$DIR/$NEEDLE" ]]; then
+                echo "$DIR/$NEEDLE"
+                return 0
+            fi
+        done
     done
 
-    echo "Could not find $NEEDLE in $HAYSTACK" >&2
+    echo "Could not find $NEEDLES in $HAYSTACK" >&2
     return 1
 }
 
@@ -241,12 +243,15 @@ EOD
     fi
 
     # HACK: current clang (3.6) fails to build clang 3.4 or earlier
+    LIBDIRS=$(ld --verbose | grep SEARCH_DIR \
+            | perl -pe 's/SEARCH_DIR\("(.+?)"\)/\1/g' \
+            | tr -s ' ;' \\012 | paste -sd ":" -)
     if verlt "3.4" "$VERSION"; then
-        CC=$(full_which "ccache/bin/clang" "$PATH:/usr/lib:/usr/local/lib")
-        CXX=$(full_which "ccache/bin/clang++" "$PATH:/usr/lib:/usr/local/lib")
+        CC=$(full_which  "ccache/clang:ccache/bin/clang"     "$PATH:$LIBDIRS")
+        CXX=$(full_which "ccache/clang++:ccache/bin/clang++" "$PATH:$LIBDIRS")
     else
-        CC=$(full_which "ccache/bin/cc" "$PATH:/usr/lib:/usr/local/lib")
-        CXX=$(full_which "ccache/bin/c++" "$PATH:/usr/lib:/usr/local/lib")
+        CC=$(full_which  "ccache/cc:ccache/bin/cc"   "$PATH:$LIBDIRS")
+        CXX=$(full_which "ccache/c++:ccache/bin/c++" "$PATH:$LIBDIRS")
     fi
     if [[ $TOOL_BUILD == "cmake" ]]; then
         FLAGS+=(-DCMAKE_C_COMPILER=$CC)
