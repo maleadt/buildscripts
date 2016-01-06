@@ -241,7 +241,7 @@ EOD
     fi
 
     # HACK: current clang (3.6) fails to build clang 3.4 or earlier
-    if verlte "3.4" "$VERSION"; then
+    if verlt "3.4" "$VERSION"; then
         CC=$(full_which "ccache/bin/clang" "$PATH:/usr/lib:/usr/local/lib")
         CXX=$(full_which "ccache/bin/clang++" "$PATH:/usr/lib:/usr/local/lib")
     else
