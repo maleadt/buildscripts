@@ -106,6 +106,14 @@ main() {
     fi
     BUILD_TARGETS=${BUILD_TARGETS:-${BUILD_TARGET_HOST}}
 
+    # Case convert the build targets
+    # TODO: not sure if this is correct
+    if [[ $TOOL_BUILD == "cmake" ]]; then
+        BUILD_TARGETS=${BUILD_TARGETS^^}
+    elif [[ $TOOL_BUILD == "autotools" ]]; then
+        BUILD_TARGETS=${BUILD_TARGETS,,}
+    fi
+
     cat <<EOD
 Build settings:
  - Installation prefix (\$PREFIX): $PREFIX
