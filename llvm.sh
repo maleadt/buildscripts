@@ -241,13 +241,18 @@ EOD
     if [[ $BUILD_SHLIB == 1 ]]; then
         if [[ $TOOL_BUILD == "cmake" ]]; then
             FLAGS+=(-DBUILD_SHARED_LIBS=On)
-            FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
-            FLAGS+=(-DLLVM_BUILD_DOCS=Off)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
             FLAGS+=(--enable-shared)
-            FLAGS+=(--enable-targets=${BUILD_TARGETS})
-            FLAGS+=(--disable-docs)
         fi
+    fi
+
+    # Other
+    if [[ $TOOL_BUILD == "cmake" ]]; then
+        FLAGS+=(-DLLVM_TARGETS_TO_BUILD=${BUILD_TARGETS/,/;})
+        FLAGS+=(-DLLVM_BUILD_DOCS=Off)
+    elif [[ $TOOL_BUILD == "autotools" ]]; then
+        FLAGS+=(--enable-targets=${BUILD_TARGETS})
+        FLAGS+=(--disable-docs)
     fi
 
     # HACK: current clang (3.6) fails to build clang 3.4 or earlier
@@ -389,9 +394,9 @@ build_llvm() {
         mkdir "${BUILDDIR}"
         pushd "${BUILDDIR}"
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            cmake "${FLAGS[@]}" "${SRCDIR}"
+            (set -x; cmake "${FLAGS[@]}" "${SRCDIR}")
         elif [[ $TOOL_BUILD == "autotools" ]]; then
-            "${SRCDIR}"/configure "${FLAGS[@]}"
+            (set -x; "${SRCDIR}"/configure "${FLAGS[@]}")
         fi
         popd
     fi
