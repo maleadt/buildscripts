@@ -258,7 +258,7 @@ EOD
     # HACK: current clang (3.6) fails to build clang 3.4 or earlier
     LIBDIRS=$(ld --verbose | grep SEARCH_DIR \
             | perl -pe 's/SEARCH_DIR\("(.+?)"\)/\1/g' \
-            | tr -s ' ;' \\012 | paste -sd ":" -)
+            | tr -s ' ;' \\012 | sed 's/^=//' | paste -sd ":" -)
     if verlt "3.4" "$VERSION"; then
         CC=$(full_which  "ccache/clang:ccache/bin/clang"     "$PATH:$LIBDIRS")
         CXX=$(full_which "ccache/clang++:ccache/bin/clang++" "$PATH:$LIBDIRS")
