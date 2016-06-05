@@ -59,9 +59,14 @@ write_config() {
 
     for VAR in  PREFIX VERSION TOOL_BUILD \
                 BUILD_SHLIB BUILD_ASSERTIONS BUILD_DEBUG \
-                BUILD_CLANG BUILD_RT BUILD_LLDB BUILD_TARGETS; do
-        local VALUE=${!VAR}
-        echo "$VAR='${VALUE//\'/''}'" >> $FILENAME
+                BUILD_CLANG BUILD_RT BUILD_LLDB BUILD_TARGETS \
+                CC CXX; do
+        eval local DEFINED=\${$VAR+x}
+        if [[ -n $DEFINED ]]; then
+            echo Checking $VAR
+            local VALUE=${!VAR}
+            echo "$VAR='${VALUE//\'/''}'" >> $FILENAME
+        fi
     done
 }
 
@@ -122,6 +127,11 @@ Build settings:
  - Shared libraries (\$BUILD_SHLIB=1|0): $BUILD_SHLIB
  - Assertions (\$BUILD_ASSERTIONS=1|0): $BUILD_ASSERTIONS
  - Debug info (\$BUILD_DEBUG=1|0): $BUILD_DEBUG
+EOD
+    [[ -n ${CC+x} ]] && echo " - C compiler: $CC"
+    [[ -n ${CXX+x} ]] && echo " - C++ compiler: $CXX"
+
+    cat <<EOD
 
 Component selection:
  - Build clang (\$BUILD_CLANG=1|0): $BUILD_CLANG
@@ -263,16 +273,24 @@ EOD
         FLAGS+=(--disable-docs)
     fi
 
-    # HACK: current clang (3.6) fails to build clang 3.4 or earlier
     LIBDIRS=$(ld --verbose | grep SEARCH_DIR \
             | perl -pe 's/SEARCH_DIR\("(.+?)"\)/\1/g' \
             | tr -s ' ;' \\012 | sed 's/^=//' | paste -sd ":" -)
-    if verlt "3.4" "$VERSION"; then
-        CC=$(full_which  "ccache/clang:ccache/bin/clang"     "$PATH:$LIBDIRS")
-        CXX=$(full_which "ccache/clang++:ccache/bin/clang++" "$PATH:$LIBDIRS")
-    else
-        CC=$(full_which  "ccache/cc:ccache/bin/cc"   "$PATH:$LIBDIRS")
-        CXX=$(full_which "ccache/c++:ccache/bin/c++" "$PATH:$LIBDIRS")
+    if [[ -z ${CC+x} ]]; then
+        # HACK: current clang (3.6) fails to build clang 3.4 or earlier
+        if verlt "3.4" "$VERSION"; then
+            CC=$(full_which  "ccache/clang:ccache/bin/clang"     "$PATH:$LIBDIRS")
+        else
+            CC=$(full_which  "ccache/cc:ccache/bin/cc"   "$PATH:$LIBDIRS")
+        fi
+    fi
+    if [[ -z ${CXX+x} ]]; then
+        # HACK: current clang (3.6) fails to build clang 3.4 or earlier
+        if verlt "3.4" "$VERSION"; then
+            CXX=$(full_which "ccache/clang++:ccache/bin/clang++" "$PATH:$LIBDIRS")
+        else
+            CXX=$(full_which "ccache/c++:ccache/bin/c++" "$PATH:$LIBDIRS")
+        fi
     fi
     if [[ $TOOL_BUILD == "cmake" ]]; then
         FLAGS+=(-DCMAKE_C_COMPILER=$CC)
