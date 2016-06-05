@@ -207,6 +207,14 @@ EOD
 
     local FLAGS=()
 
+    # Fix up references to python if our system python is python3
+    if [[ $(readlink $(which python)) =~ python3 ]]; then
+        # TODO: is modifying scripts really necessary?
+        ag -l '#!/usr/bin.*python\b' "${SRC_LLVM}" \
+            | xargs perl -p -i -e 's{(#!/usr/bin.*)python\b}{$1python2}'
+        FLAGS+=(-DPYTHON_EXECUTABLE=$(which python2))
+    fi
+
     # Debug symbols
     if [[ $BUILD_DEBUG == 1 ]]; then
         if [[ $TOOL_BUILD == "cmake" ]]; then
