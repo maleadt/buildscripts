@@ -63,7 +63,6 @@ write_config() {
                 CC CXX; do
         eval local DEFINED=\${$VAR+x}
         if [[ -n $DEFINED ]]; then
-            echo Checking $VAR
             local VALUE=${!VAR}
             echo "$VAR='${VALUE//\'/''}'" >> $FILENAME
         fi
