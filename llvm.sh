@@ -242,7 +242,7 @@ EOD
     # Assertions
     if [[ $BUILD_ASSERTIONS == 1 ]]; then
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS=True)
+            FLAGS+=(-DLLVM_ENABLE_ASSERTIONS:BOOL=ON)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
             FLAGS+=(--enable-assertions)
         fi
@@ -257,7 +257,7 @@ EOD
     # Determine shared build flags
     if [[ $BUILD_SHLIB == 1 ]]; then
         if [[ $TOOL_BUILD == "cmake" ]]; then
-            FLAGS+=(-DBUILD_SHARED_LIBS=On)
+            FLAGS+=(-DLLVM_BUILD_LLVM_DYLIB:BOOL=ON)
         elif [[ $TOOL_BUILD == "autotools" ]]; then
             FLAGS+=(--enable-shared)
         fi
