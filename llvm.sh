@@ -277,18 +277,18 @@ EOD
             | tr -s ' ;' \\012 | sed 's/^=//' | paste -sd ":" -)
     if [[ -z ${CC+x} ]]; then
         # HACK: current clang (3.6) fails to build clang 3.4 or earlier
-        if verlt "3.4" "$VERSION"; then
-            CC=$(full_which  "ccache/clang:ccache/bin/clang"     "$PATH:$LIBDIRS")
-        else
+        if verlte "$VERSION" "3.4"; then
             CC=$(full_which  "ccache/cc:ccache/bin/cc"   "$PATH:$LIBDIRS")
+        else
+            CC=$(full_which  "ccache/clang:ccache/bin/clang"     "$PATH:$LIBDIRS")
         fi
     fi
     if [[ -z ${CXX+x} ]]; then
         # HACK: current clang (3.6) fails to build clang 3.4 or earlier
-        if verlt "3.4" "$VERSION"; then
-            CXX=$(full_which "ccache/clang++:ccache/bin/clang++" "$PATH:$LIBDIRS")
-        else
+        if verlte "$VERSION" "3.4"; then
             CXX=$(full_which "ccache/c++:ccache/bin/c++" "$PATH:$LIBDIRS")
+        else
+            CXX=$(full_which "ccache/clang++:ccache/bin/clang++" "$PATH:$LIBDIRS")
         fi
     fi
     if [[ $TOOL_BUILD == "cmake" ]]; then
