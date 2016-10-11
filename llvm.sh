@@ -84,7 +84,8 @@ main() {
     # Configuration
     #
 
-    PREFIX=${PREFIX:-~/Lokaal/llvm}
+    PREFIX=${PREFIX:-/opt/llvm}
+    [[ -w ${PREFIX} ]] || error "prefix ${PREFIX} is not writable"
 
     VERSION=${VERSION:-trunk}
 
