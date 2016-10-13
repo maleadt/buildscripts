@@ -85,12 +85,11 @@ main() {
     #
 
     PREFIX=${PREFIX:-/opt/llvm}
-    [[ -w ${PREFIX} ]] || error "prefix ${PREFIX} is not writable"
 
     VERSION=${VERSION:-trunk}
 
     TOOL_BUILD=${TOOL_BUILD:-cmake}
-    TOOL_BUILD=${TOOL_BUILD,,}
+    TOOL_BUILD=$(echo ${TOOL_BUILD} | tr '[:upper:]' '[:lower:]')
     if [[ $TOOL_BUILD != "cmake" && $TOOL_BUILD != "autotools" ]]; then
         error "invalid build system ${TOOL_BUILD}"
     fi
@@ -114,9 +113,9 @@ main() {
     # Case convert the build targets
     # TODO: not sure if this is correct
     if [[ $TOOL_BUILD == "cmake" ]]; then
-        BUILD_TARGETS=${BUILD_TARGETS^^}
+        BUILD_TARGETS=$(echo ${BUILD_TARGETS} | tr '[:lower:]' '[:upper:]')
     elif [[ $TOOL_BUILD == "autotools" ]]; then
-        BUILD_TARGETS=${BUILD_TARGETS,,}
+        BUILD_TARGETS=$(echo ${BUILD_TARGETS} | tr '[:upper:]' '[:lower:]')
     fi
 
     cat <<EOD
@@ -150,10 +149,11 @@ EOD
     # Prepare
     #
 
-    [[ -d "$PREFIX" ]] || error "installation prefix $PREFIX does not exist..."
+    [[ -d ${PREFIX} ]] || error "installation prefix $PREFIX does not exist..."
+    [[ -w ${PREFIX} ]] || error "installation prefix $PREFIX is not writable..."
 
     # Determine path prefix
-    local PATH_PREFIX="$PREFIX/llvm-$VERSION"
+    local PATH_PREFIX="${PREFIX}/llvm-$VERSION"
 
     [[ $BUILD_DEBUG = 1 ]] && TAG="debug" || TAG="release"
     [[ $BUILD_ASSERTIONS = 1 ]] && TAG+="+asserts"
@@ -220,7 +220,7 @@ EOD
     # Fix up references to python if our system python is python3 (fixed on 3.9)
     if [[ $(readlink $(which python)) =~ python3 ]] && verlt "$VERSION" "3.9"; then
         # TODO: is modifying scripts really necessary?
-        rg -l '#!/usr/bin.*python\b' "${SRC_LLVM}" \
+        ag -l '#!/usr/bin.*python\b' "${SRC_LLVM}" \
             | xargs perl -p -i -e 's{(#!/usr/bin.*)python\b}{$1python2}'
         FLAGS+=(-DPYTHON_EXECUTABLE=$(which python2))
     fi
