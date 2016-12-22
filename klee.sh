@@ -6,9 +6,6 @@ set -eu
 #
 # Everything is downloaded into subdirectories of the current directory.
 # 
-# Default installation directory: $PWD/kleebuild.
-# Can be overridden via INSTALL_PREFIX
-#
 # By default, a dependency (or KLEE) is not rebuilt if its subdirectory already
 # existed in the current directory.
 # Can force rebuilding everything with REBUILD_ALL=1, and of components with
@@ -17,7 +14,6 @@ set -eu
 # If you rebuild a component, all dependencies are automatically rebuilt too.
 
 
-: ${INSTALL_PREFIX:=$PWD/kleebuild}
 LLVMVER=3.4
 
 clanghelp() {
@@ -25,6 +21,17 @@ clanghelp() {
   echo Example: ~Lokaal/llvm/llvm-${LLVMVER}.src/build/debug+asserts/Debug+Asserts/bin
   exit 1
 }
+
+if [ $# -ne 1 ]; then
+  echo Usage: $0 builddir
+  exit 1
+fi
+
+BASEDIR=`realpath "$1"`
+INSTALL_PREFIX="$BASEDIR/kleebuild"
+mkdir -p "$INSTALL_PREFIX"
+
+cd "$BASEDIR"
 
 if [ ${REBUILD_ALL:=0} != 0 ]; then
   REBUILD_MINISAT=1
